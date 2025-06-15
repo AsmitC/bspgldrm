@@ -1,4 +1,4 @@
-#' TItle: Fits a finite-support Dir-GLM model
+#' Title: Fits a finite-support Dir-GLM model
 #'
 #' @import stats
 #' @import mvtnorm
@@ -38,6 +38,23 @@
 #' \code{link} argument, then this will be an object of class "link-glm".
 #' Otherwise, it will be the list of three functions passed to the \code{link} argument.
 #' }
+#'
+#' @examples
+#' data(iris, package="datasets")
+#'
+#' # Fit a bspgldrm with log link
+#' fit <- bspgldrm(Sepal.Length ~ Sepal.Width + Petal.Length + Petal.Width + Species,
+#'                 data=iris)
+#' fit
+#'
+#' # Fit a bspgldrm with custom link function
+#' link <- list()
+#' link$linkfun <- function(mu) log(mu)^3
+#' link$linkinv <- function(eta) exp(eta^(1/3))
+#' link$mu.eta <- function(eta) exp(eta^(1/3)) * 1/3 * eta^(-2/3)
+#' fit2 <- bspgldrm(Sepal.Length ~ Sepal.Width + Petal.Length + Petal.Width + Species,
+#'                  data=iris, link=link)
+#' fit2
 #'
 #' @export
 bspgldrm <- function(formula, data=NULL, link="log",
