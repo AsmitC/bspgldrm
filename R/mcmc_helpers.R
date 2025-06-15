@@ -1,7 +1,3 @@
-## Note that: The functions below are written w.r.t. the log link as in our data
-## applications. For using a different link function for your analysis, a very few
-## places need modification --- check for `# due to log link ...` comment.
-
 ## Required packages -----
 ## gldrm, mvtnorm
 
@@ -97,6 +93,7 @@ f0y <- function(y, spt, f0) {
 
 Sigma_beta <- function(X, mu, bpr2, rho, linkfun, mu.eta) {
   eta <- linkfun(mu)
+  # gpr <- as.numeric(1 / mu)              # due to log link: g'(mu) = 1 / mu
   gpr <- as.numeric(1 / mu.eta(eta))       # Updated for general link
   gprsq_bpr2 <- gpr ^ 2 * bpr2
   Xstar <- X / sqrt(gprsq_bpr2)
@@ -212,12 +209,14 @@ beta_update_joint <- function(X,
                               cr_tht,
                               cr_bpr2,
                               cr_btht,
-                              rho) {
+                              rho,
+                              linkinv) {
   n <- dim(X)[1]
   l <- length(spt)
 
   pr_bt <- mvtnorm::rmvnorm(1, mean = cr_bt, sigma = cr_Sig) %>% as.vector()
-  pr_mu <- exp(X %*% pr_bt) %>% as.numeric()  # due to log link: g^{-1}(y) = exp(y)
+  # pr_mu <- exp(X %*% pr_bt) %>% as.numeric()       # due to log link: g^{-1}(y) = exp(y)
+  pr_mu <- as.numeric(linkinv(X %*% pr_bt))          # Updated for general link
 
   if (sum(spt[1] <= pr_mu & pr_mu <= spt[l]) == n) {
     out <- tht_sol(spt, cr_f0, pr_mu, cr_tht)
@@ -286,7 +285,8 @@ beta_update_separate <- function(X,
                                  cr_tht,
                                  cr_bpr2,
                                  cr_btht,
-                                 rho) {
+                                 rho,
+                                 linkinv) {
   n <- dim(X)[1]
   p <- dim(X)[2]
   l <- length(spt)
@@ -295,7 +295,8 @@ beta_update_separate <- function(X,
     cr_sd <- sqrt(diag(cr_Sig))
     pr_bt <- cr_bt
     pr_bt[j] <- cr_bt[j] + rnorm(1, mean = 0, sd = cr_sd[j])
-    pr_mu <- exp(X %*% pr_bt) %>% as.numeric()      # due to log link: g^{-1}(y) = exp(y)
+    # pr_mu <- exp(X %*% pr_bt) %>% as.numeric()     # due to log link: g^{-1}(y) = exp(y)
+    pr_mu <- as.numeric(linkinv(X %*% or_bt))        # Updated for general link
 
     if (sum(spt[1] <= pr_mu & pr_mu <= spt[l]) == n) {
       out <- tht_sol(spt, cr_f0, pr_mu, cr_tht)

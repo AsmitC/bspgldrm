@@ -26,10 +26,9 @@
 bspgldrm.control <- function(burnin=1000, thin=1, save=5000, rho=1, mu0=NULL,
                              betaStart=NULL, f0Start=NULL, joint.update=TRUE)
 {
-
-  if (burnin < 0) stop("Number of burn-in samples must be >= 0")
-  if (thin < 1) stop("Thin must be >= 1")
-  if (save < 1) stop("Must save at least one iteration")
+  if (burnin < 0)            stop("Number of burn-in samples must be >= 0")
+  if (thin < 1)              stop("Thin must be >= 1")
+  if (save < 1)              stop("Must save at least one iteration")
   if (!(rho <= 1 & rho > 0)) stop("rho must lie in (0, 1]")
   ctrl <- list(burnin      = burnin,
                thin        = thin,
@@ -118,31 +117,31 @@ bspgldrmFit <- function(X, y,
 
   ## 4. MCMC loop
   for (r in 2:iter) {
-    # Beta update
+    ### 4.1 Beta update
     Sig <- Sigma_beta(X, mu, bpr2, rho, linkfun, mu.eta)
     b_out <- ifelse(joint.update,
                     beta_update_joint(X, y, spt, beta, Sig, f0,
-                                      tht, bpr2, btht, rho),
+                                      tht, bpr2, btht, rho, linkinv),
                     beta_update_separate(X, y, spt, beta, Sig, f0,
-                                         tht, bpr2, btht, rho))
+                                         tht, bpr2, btht, rho, linkinv))
     beta <- b_out$cr_bt
     tht  <- b_out$cr_tht
     btht <- b_out$cr_btht
     bpr2 <- b_out$cr_bpr2
     mu   <- linkinv(X %*% beta)                   # Updated for general link
 
-    # f0 update
-    pdir <- dir_parm(y, tht, btht, dir_pr_parm, ind_mt)
-    f_out <- f0_update(y, spt, f0, f0_y, pdir,
-                       mu, tht, bpr2, btht, dir_pr_parm, ind_mt)
-    f0    <- f_out$cr_f0
-    f0_y  <- f_out$cr_f0y
-    tht   <- f_out$cr_tht
-    btht  <- f_out$cr_btht
-    bpr2  <- f_out$cr_bpr2
+    ### 4.2 f0 update
+    propsl_dir_parm <- dir_parm(y, tht, btht, dir_pr_parm, ind_mt)
+    out             <- f0_update(y, spt, f0, f0_y, propsl_dir_parm,
+                                 mu, tht, bpr2, btht, dir_pr_parm, ind_mt)
+    f0    <- out$cr_f0
+    f0_y  <- out$cr_f0y
+    tht   <- out$cr_tht
+    btht  <- out$cr_btht
+    bpr2  <- out$cr_bpr2
 
-    # Store post burn-in samples
-    if (r > burnin && (r - burnin) %% thin == 0) {
+    # 4.3 Storage
+    if (r > burnin & r %% thin == 0) {
       j <- (r - burnin) / thin
       beta_samples[j, ] <- beta
       f0_samples[j, ]   <- f0

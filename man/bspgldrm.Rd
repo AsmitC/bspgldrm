@@ -2,7 +2,7 @@
 % Please edit documentation in R/bspgldrm.R
 \name{bspgldrm}
 \alias{bspgldrm}
-\title{TItle: Fits a finite-support Dir-GLM model}
+\title{Fits a finite-support Dir-GLM model}
 \usage{
 bspgldrm(
   formula,
@@ -40,7 +40,7 @@ See \code{theta.control} documentation for details.}
 An S3 object of class "bspgldrm". See details.
 }
 \description{
-TItle: Fits a finite-support Dir-GLM model
+Fits a finite-support Dir-GLM model
 }
 \details{
 The arguments \code{linkfun}, \code{linkinv}, and \code{mu.eta}
@@ -56,4 +56,22 @@ The "bspgldrm" class is a list of the following items.
 \code{link} argument, then this will be an object of class "link-glm".
 Otherwise, it will be the list of three functions passed to the \code{link} argument.
 }
+}
+\examples{
+data(iris, package="datasets")
+
+# Fit a bspgldrm with log link
+fit <- bspgldrm(Sepal.Length ~ Sepal.Width + Petal.Length + Petal.Width + Species,
+                data=iris)
+fit
+
+# Fit a bspgldrm with custom link function
+link <- list()
+link$linkfun <- function(mu) log(mu)^3
+link$linkinv <- function(eta) exp(eta^(1/3))
+link$mu.eta <- function(eta) exp(eta^(1/3)) * 1/3 * eta^(-2/3)
+fit2 <- bspgldrm(Sepal.Length ~ Sepal.Width + Petal.Length + Petal.Width + Species,
+                 data=iris, link=link)
+fit2
+
 }
