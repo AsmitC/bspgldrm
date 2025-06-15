@@ -1,0 +1,338 @@
+## Note that: The functions below are written w.r.t. the log link as in our data
+## applications. For using a different link function for your analysis, a very few
+## places need modification --- check for `# due to log link ...` comment.
+
+## Required packages -----
+## gldrm, mvtnorm
+
+#' Title: function for finding theta, btheta & bprime2
+#'
+#' @param spt (vector) support, \{s_j, j = 1(1)l\}, of response variable y
+#' @param f0 (vector) \{f0(y = s_j), j=1(1)l\}: free parameter, f0(.) centering density
+#' @param mu (vector) \{E(y_i | x_i), i=1(1)n\}
+#' @param thtst (vector) initial value in theta solving iterative algorithm
+#'
+#' @return (list) containing:
+#' 1. bpr2 (vector) \{second derivative of b(theta_i), i=1(1)n\}
+#' 2. tht (vector) derived parameter theta = \{theta_i = function(beta, f0, x_i), i=1(1)n\}
+#' 3. btht (vector)  normalizing constant b(theta) = \{b(theta_i), i=1(1)n\}
+#' @export
+#'
+#' @examples
+
+tht_sol <- function(spt, f0, mu, thtst) {
+  out <- gldrm:::getTheta(
+    spt = spt,
+    f0 = f0,
+    mu = mu,
+    sampprobs = NULL,
+    ySptIndex = NULL,
+    thetaStart = thtst
+  )
+  tht <- out$theta
+  bpr2 <- out$bPrime2
+  btht <- apply(exp(outer(tht, spt, "*")), 1, function(row)
+    log(sum(row * f0)))
+  return(list(bpr2 = bpr2, tht = tht, btht = btht))
+}
+
+
+
+#' Title: function for finding dirichlet proposal parameter
+#'
+#' @param y (vector) response variable values \{y_i, i=1(1)n\}
+#' @param tht (vector) derived parameter, \{theta_i = function(beta, f0, x_i), i=1(1)n\}
+#' @param btht (vector)  normalizing constant b(theta) = \{b(theta_i), i=1(1)n\}
+#' @param dir_pr_parm (vector) dirichlet prior parameter
+#' @param ind_mt indicator matrix with (i,j)th element: 1(y_i == s_j)
+#'
+#' @return (vector) dirichlet proposal parameter
+#' @export
+#'
+#' @examples
+
+dir_parm <- function(y, tht, btht, dir_pr_parm, ind_mt) {
+  wgt <- (1 / exp(tht * y - btht)) %>% `/` (sum(.)) %>% as.numeric()
+  parm <- dir_pr_parm + colSums(ind_mt * wgt)
+
+  return(parm)
+}
+
+
+#' Title: function for calculating \{f0(y_i), i = 1(1)n\}
+#'
+#' @param y (vector) response variable
+#' @param spt (vector) support, \{s_j, j = 1(1)l\}, of response variable y
+#' @param f0 (vector) \{f0(s_j), j=1(1)l\}: free parameter, f0(.) centering density
+#'
+#' @return (vector) \{f0(y_i), i=1(1)n\}
+#' @export
+#'
+#' @examples
+
+f0y <- function(y, spt, f0) {
+  n <- length(y)
+  f0_y <- numeric(n)
+
+  for (i in 1:n) {
+    f0_y[i] <- sum(f0[y[i] == spt])
+  }
+
+  return(f0_y)
+}
+
+
+
+#' Title: function for finding variance-covariance matrix of beta
+#'
+#' @param X design (matrix)
+#' @param mu (vector) \{E(y_i | x_i), i=1(1)n\}
+#' @param bpr2 (vector) \{second derivative of b(theta_i), i=1(1)n\}
+#' @param rho MCMC update step size, a (scalar) in (0, 1]
+#'
+#' @return variance-covariance (matrix) of beta
+#' @export
+#'
+#' @examples
+
+Sigma_beta <- function(X, mu, bpr2, rho, linkfun, mu.eta) {
+  eta <- linkfun(mu)
+  gpr <- as.numeric(1 / mu.eta(eta))       # Updated for general link
+  gprsq_bpr2 <- gpr ^ 2 * bpr2
+  Xstar <- X / sqrt(gprsq_bpr2)
+  info_mt <- t(Xstar) %*% Xstar
+  Sigma <- rho ^ 2 * solve(info_mt)
+
+  return(Sigma)
+}
+
+
+
+#' Title: function for updating f0
+#'
+#' @param y response variable
+#' @param spt y support
+#' @param cr_f0 current f0 = \{f0(s_j), j=1(1)l\}
+#' @param cr_f0y current f0(y) = \{f0(y_i), i=1(1)n\}
+#' @param cr_dir_parm current dirichlet proposal parameter
+#' @param cr_mu current mu
+#' @param cr_tht current theta
+#' @param cr_bpr2 current \{second derivative of b(theta_i), i=1(1)n\}
+#' @param cr_btht current b(theta)
+#' @param dir_pr_parm dirichlet prior parameter
+#' @param ind_mt indicator matrix with (i,j)th element: 1(y_i == s_j)
+#'
+#' @return
+#' @export
+#'
+#' @examples
+
+f0_update <- function(y,
+                      spt,
+                      cr_f0,
+                      cr_f0y,
+                      cr_dir_parm,
+                      cr_mu,
+                      cr_tht,
+                      cr_bpr2,
+                      cr_btht,
+                      dir_pr_parm,
+                      ind_mt) {
+  n <- length(y)
+  l <- length(spt)
+
+  for (j in 1:l) {
+    pr_f0 <- cr_f0
+    pr_f0[j] <- rbeta(1, cr_dir_parm[j], sum(cr_dir_parm[-j]))
+    pr_f0[-j] <- pr_f0[-j] * (1 - pr_f0[j]) / sum(pr_f0[-j])
+
+    if (sum(pr_f0 < 1e-3) == 0) {
+      out <- tht_sol(spt, pr_f0, cr_mu, cr_tht)
+      pr_tht <- out$tht
+      pr_btht <- out$btht
+      pr_bpr2 <- out$bpr2
+      pr_dir_parm <- dir_parm(y, pr_tht, pr_btht, dir_pr_parm, ind_mt)
+      pr_f0y <- f0y(y, spt, pr_f0)
+
+      pr_llik <- sum(pr_tht * y - pr_btht + log(pr_f0y))
+      cr_llik <- sum(cr_tht * y - cr_btht + log(cr_f0y))
+
+      pr_pf0 <- ddirichlet(pr_f0, dir_pr_parm, log = T)
+      cr_pf0 <- ddirichlet(cr_f0, dir_pr_parm, log = T)
+      cr_qf0 <- ddirichlet(cr_f0, pr_dir_parm, log = T)
+      pr_qf0 <- ddirichlet(pr_f0, cr_dir_parm, log = T)
+
+      alp <- min(0, (pr_llik - cr_llik + pr_pf0 - cr_pf0 + cr_qf0 - pr_qf0))
+
+      if (log(runif(1)) < alp) {
+        cr_f0 <- pr_f0
+        cr_tht <- pr_tht
+        cr_btht <- pr_btht
+        cr_f0y <- pr_f0y
+        cr_bpr2 <- pr_bpr2
+      }
+    }
+  }
+  return(
+    list(
+      cr_f0 = cr_f0,
+      cr_f0y = cr_f0y,
+      cr_tht = cr_tht,
+      cr_btht = cr_btht,
+      cr_bpr2 = cr_bpr2
+    )
+  )
+}
+
+
+
+#' Title : function for updating beta (jointly)
+#'
+#' @param X design matrix
+#' @param y response variable
+#' @param spt support of y
+#' @param cr_bt current beta
+#' @param cr_Sig variance-covariance matrix for current beta
+#' @param cr_f0 current f0 = \{f0(s_j), j=1(1)l\}
+#' @param cr_tht current theta
+#' @param cr_bpr2 current \{second derivative of b(theta_i), i=1(1)n\}
+#' @param cr_btht current b(theta)
+#' @param rho MCMC update step size, a (scalar) in (0, 1]
+#'
+#' @return
+#' @export
+#'
+#' @examples
+beta_update_joint <- function(X,
+                              y,
+                              spt,
+                              cr_bt,
+                              cr_Sig,
+                              cr_f0,
+                              cr_tht,
+                              cr_bpr2,
+                              cr_btht,
+                              rho) {
+  n <- dim(X)[1]
+  l <- length(spt)
+
+  pr_bt <- mvtnorm::rmvnorm(1, mean = cr_bt, sigma = cr_Sig) %>% as.vector()
+  pr_mu <- exp(X %*% pr_bt) %>% as.numeric()  # due to log link: g^{-1}(y) = exp(y)
+
+  if (sum(spt[1] <= pr_mu & pr_mu <= spt[l]) == n) {
+    out <- tht_sol(spt, cr_f0, pr_mu, cr_tht)
+    pr_bpr2 <- out$bpr2
+    pr_tht <- out$tht
+    pr_btht <- out$btht
+    pr_Sig <- Sigma_beta(X, pr_mu, pr_bpr2, rho)
+
+    pr_llik <- sum(pr_tht * y - pr_btht)
+    cr_llik <- sum(cr_tht * y - cr_btht)
+    pr_pbt <- dmvnorm(pr_bt, log = T)
+    cr_pbt <- dmvnorm(cr_bt, log = T)
+    cr_qbt <- dmvnorm(cr_bt,
+                      mean = pr_bt,
+                      sigma = pr_Sig,
+                      log = T)
+    pr_qbt <- dmvnorm(pr_bt,
+                      mean = cr_bt,
+                      sigma = cr_Sig,
+                      log = T)
+
+    alp <- min(0, pr_llik - cr_llik + pr_pbt - cr_pbt + cr_qbt - pr_qbt)
+
+    if (log(runif(1)) < alp) {
+      cr_bt <- pr_bt
+      cr_tht <- pr_tht
+      cr_btht <- pr_btht
+      cr_bpr2 <- pr_bpr2
+      cr_Sig <- pr_Sig
+    }
+  }
+  return(list(
+    cr_bt = cr_bt,
+    cr_tht = cr_tht,
+    cr_btht = cr_btht,
+    cr_bpr2
+    = cr_bpr2
+  ))
+}
+
+
+
+#' Title: function for updating beta (one at a time)
+#'
+#' @param X design matrix
+#' @param y response variable
+#' @param spt support of y
+#' @param cr_bt current beta
+#' @param cr_Sig variance-covariance matrix for current beta
+#' @param cr_f0 current f0 = \{f0(s_j), j=1(1)l\}
+#' @param cr_tht current theta
+#' @param cr_bpr2 current \{second derivative of b(theta_i), i=1(1)n\}
+#' @param cr_btht current b(theta)
+#' @param rho MCMC update step size, a (scalar) in (0, 1]
+#'
+#' @return
+#' @export
+#'
+#' @examples
+beta_update_separate <- function(X,
+                                 y,
+                                 spt,
+                                 cr_bt,
+                                 cr_Sig,
+                                 cr_f0,
+                                 cr_tht,
+                                 cr_bpr2,
+                                 cr_btht,
+                                 rho) {
+  n <- dim(X)[1]
+  p <- dim(X)[2]
+  l <- length(spt)
+
+  for (j in 1:p) {
+    cr_sd <- sqrt(diag(cr_Sig))
+    pr_bt <- cr_bt
+    pr_bt[j] <- cr_bt[j] + rnorm(1, mean = 0, sd = cr_sd[j])
+    pr_mu <- exp(X %*% pr_bt) %>% as.numeric()      # due to log link: g^{-1}(y) = exp(y)
+
+    if (sum(spt[1] <= pr_mu & pr_mu <= spt[l]) == n) {
+      out <- tht_sol(spt, cr_f0, pr_mu, cr_tht)
+      pr_tht <- out$tht
+      pr_btht <- out$btht
+      pr_bpr2 <- out$bpr2
+      pr_Sig <- Sigma_beta(X, pr_mu, pr_bpr2, rho)
+      pr_sd <- sqrt(diag(pr_Sig))
+
+      pr_llik <- sum(pr_tht * y - pr_btht)
+      cr_llik <- sum(cr_tht * y - cr_btht)
+      pr_pbt <- dnorm(pr_bt[j], log = T)
+      cr_pbt <- dnorm(cr_bt[j], log = T)
+      cr_qbt <- dnorm(cr_bt[j],
+                      mean = pr_bt[j],
+                      sd = pr_sd[j],
+                      log = T)
+      pr_qbt <- dnorm(pr_bt[j],
+                      mean = cr_bt[j],
+                      sd = cr_sd[j],
+                      log = T)
+
+      alp <- min(0, pr_llik - cr_llik + pr_pbt - cr_pbt + cr_qbt - pr_qbt)
+
+      if (log(runif(1)) < alp) {
+        cr_bt <- pr_bt
+        cr_tht <- pr_tht
+        cr_btht <- pr_btht
+        cr_bpr2 <- pr_bpr2
+      }
+    }
+  }
+  return(list(
+    cr_bt = cr_bt,
+    cr_tht = cr_tht,
+    cr_btht = cr_btht,
+    cr_bpr2
+    = cr_bpr2
+  ))
+}

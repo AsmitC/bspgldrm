@@ -1,4 +1,4 @@
-#' Title: Fits a finite-support Dir-GLM model
+#' Fits a finite-support Dir-GLM model
 #'
 #' @import stats
 #' @import mvtnorm
@@ -60,13 +60,13 @@
 bspgldrm <- function(formula, data=NULL, link="log",
                      bspgldrmControl=bspgldrm.control(), thetaControl=theta.control())
 {
-  ## 1. Model Initialization
+  ## 1. Model initialization
   mf <- stats::model.frame(formula, data)
   X  <- stats::model.matrix(attr(mf, "terms"), mf)
   attributes(X)[c("assign", "contrasts")] <- NULL
   y  <- stats::model.response(mf, type = "numeric")
 
-  ## 2. Link Extraction
+  ## 2. Extract link
   if (is.character(link)) {
     link <- stats::make.link(link)
   } else if (!is.list(link) ||
@@ -74,47 +74,18 @@ bspgldrm <- function(formula, data=NULL, link="log",
     stop("link must be a string or a list containing linkfun, linkinv, mu.eta")
   }
 
-  if (is.null(mu0)) {
-    mu0 <- mean(y)
-  } else if (mu0<=min(spt) || mu0>=max(spt)) {
-    stop(paste0("mu0 must lie within the range of observed values. Choose a different ",
-                "value or set mu0=NULL to use the default value, mean(y)."))
-  }
-
-  ## 3. MCMC Initialization
-  betaStart <- bspgldrmControl$betaStart
-  f0Start   <- bspgldrmControl$f0Start
-  if (is.null(betaStart) || is.null(f0Start)) {
-    gfit <- gldrm(formula       = formula,
-                  data          = data,
-                  link          = link,
-                  mu0           = mu0,
-                  gldrmControl  = gldrm.control(),
-                  thetaControl  = thetaControl)
-    if (is.null(betaStart)) betaStart <- gfit$beta
-    if (is.null(f0Start))   f0Start   <- gfit$f0
-  }
-
-  init <- list(beta = betaStart,
-               f0   = f0Start)
-  spt <- sort(unique(y)) # Observed support
-
-  ## 4. Call MCMC helper
+  ## 3. Call MCMC helper
   fit <- bspgldrmFit(
-    X            = X,
-    y            = y,
-    spt          = spt,
-    init         = init,
-    joint.update = bspgldrmControl$joint.update,
-    mu0          = mu0,
-    rho          = bspgldrmControl$rho,
-    burnin       = bspgldrmControl$burnin,
-    thin         = bspgldrmControl$thin,
-    save         = bspgldrmControl$save,
-    thetaControl = thetaControl
+    X                    = X,
+    y                    = y,
+    linkfun              = link$linkfun,
+    linkinv              = link$linkinv,
+    mu.eta               = link$mu.eta,
+    bspgldrmControl      = bspgldrmControl,
+    thetaControl         = thetaControl
   )
 
-  ## 5. Output
+  ## 4. Output
   out <- list(
     samples = fit$samples,
     formula = formula,

@@ -43,4 +43,114 @@ bspgldrm.control <- function(burnin=1000, thin=1, save=5000, rho=1, mu0=NULL,
   ctrl
 }
 
+#' Main MCMC function
+#'
+#' This function is called by the main \code{bspgldrm} function.
+#'
+#' @keywords internal
+bspgldrmFit <- function(X, y,
+                        linkfun, linkinv, mu.eta,
+                        control, thetaControl)
+{
+  ## 1. Extract control parameters
+  burnin       <- control$burnin
+  thin         <- control$thin
+  save         <- control$save
+  rho          <- control$rho
+  mu0          <- control$mu0
+  joint.update <- control$joint.update
+  betaStart    <- control$betaStart
+  f0Start      <- control$f0Start
+
+  spt <- sort(unique(y)) ## Observed support
+
+  ## 2. Initialize mu0 if not provided by the user
+  if (is.null(mu0)) {
+    mu0 <- mean(y)
+  } else if (mu0 <= min(spt) || mu0 >= max(spt)) {
+    stop(paste0("mu0 must lie within the range of observed values. Choose a different ",
+                "value or set mu0=NULL to use the default value, mean(y)."))
+  }
+
+  ## 3. MCMC Initialization
+  if (is.null(betaStart) || is.null(f0Start)) {
+    ### Fit gldrm by default
+    gfit <- gldrm(formula      = formula,
+                  data         = data,
+                  link         = link,
+                  mu0          = mu0,
+                  gldrmControl = gldrm.control(),
+                  thetaControl = thetaControl)
+    if (is.null(betaStart)) betaStart <- gfit$beta
+    if (is.null(f0Start))   f0Start   <- gfit$f0
+  }
+
+  init <- list(beta = betaStart, f0 = f0Start)
+  X    <- as.matrix(X)
+  n    <- length(y)
+  p    <- ncol(X)
+  l    <- length(spt)
+  iter <- burnin + thin * save
+
+  ### 3.1 Beta and f0
+  beta_samples <- matrix(NA, nrow = save, ncol = p)
+  f0_samples   <- matrix(NA, nrow = save, ncol = l)
+
+  beta <- init$beta
+  f0   <- init$f0
+  beta_samples[1, ] <- beta
+  f0_samples[1, ]   <- f0
+
+  ### 3.2 Dirichlet prior
+  ind_mt      <- outer(y, spt, `==`) * 1
+  alpha       <- 1
+  dir_pr_parm <- alpha * colMeans(ind_mt)
+  eps         <- 1e-6
+  dir_pr_parm <- dir_pr_parm + eps
+
+  # 3.3 Theta
+  mu      <- linkinv(X %*% beta)                    # Updated for general link
+  out     <- tht_sol(spt, f0, mu, NULL)
+  tht     <- out$tht
+  btht    <- out$btht
+  bpr2    <- out$bpr2
+  f0_y    <- f0y(y, spt, f0)
+
+  ## 4. MCMC loop
+  for (r in 2:iter) {
+    # Beta update
+    Sig <- Sigma_beta(X, mu, bpr2, rho, linkfun, mu.eta)
+    b_out <- ifelse(joint.update,
+                    beta_update_joint(X, y, spt, beta, Sig, f0,
+                                      tht, bpr2, btht, rho),
+                    beta_update_separate(X, y, spt, beta, Sig, f0,
+                                         tht, bpr2, btht, rho))
+    beta <- b_out$cr_bt
+    tht  <- b_out$cr_tht
+    btht <- b_out$cr_btht
+    bpr2 <- b_out$cr_bpr2
+    mu   <- linkinv(X %*% beta)                   # Updated for general link
+
+    # f0 update
+    pdir <- dir_parm(y, tht, btht, dir_pr_parm, ind_mt)
+    f_out <- f0_update(y, spt, f0, f0_y, pdir,
+                       mu, tht, bpr2, btht, dir_pr_parm, ind_mt)
+    f0    <- f_out$cr_f0
+    f0_y  <- f_out$cr_f0y
+    tht   <- f_out$cr_tht
+    btht  <- f_out$cr_btht
+    bpr2  <- f_out$cr_bpr2
+
+    # Store post burn-in samples
+    if (r > burnin && (r - burnin) %% thin == 0) {
+      j <- (r - burnin) / thin
+      beta_samples[j, ] <- beta
+      f0_samples[j, ]   <- f0
+    }
+  }
+
+  ## 5. Output
+  list(samples = list(beta = beta_samples,
+                      f0   = f0_samples))
+}
 
