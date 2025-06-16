@@ -23,7 +23,7 @@
 #' @return Object of S3 class "bspgldrmControl"
 #'
 #' @export
-bspgldrm.control <- function(burnin=1000, thin=1, save=5000, rho=1, mu0=NULL,
+bspgldrm.control <- function(burnin=1000, thin=1, save=5000, rho=0.1, mu0=NULL,
                              betaStart=NULL, f0Start=NULL, joint.update=TRUE)
 {
   if (burnin < 0)            stop("Number of burn-in samples must be >= 0")
