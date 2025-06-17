@@ -96,7 +96,7 @@ bspgldrm <- function(formula, data=NULL, link="log", mb=NULL, sb=NULL, dir_pr_pa
 
     if (!is.vectorized(linkfun, linkfun.testdata) ||
         !is.vectorized(linkinv, inveta.testdata)  ||
-        !is.vectorized(mu.eta, inveta.testdata)) stop(paste0("link must be vectorized."))
+        !is.vectorized(mu.eta, inveta.testdata)) stop("link must be vectorized.")
   }
 
   ## 3. Call MCMC helper

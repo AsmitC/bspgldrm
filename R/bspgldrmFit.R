@@ -108,9 +108,9 @@ bspgldrmFit <- function(X, y,                               # Data
     mb <- rep(0, p)
     sb <- rep(1, p)
   } else if (length(mb) != p) stop("length(mb) must match the number of covariates.")
-  else if (length(sb) != p) stop("length(sb) must match the number of covariates.")
-  else if (!all(sb) > 0) stop("Beta prior variance-covariance matrix must be positive definite.
-                              Check that all(sb > 0).")
+  else if   (length(sb) != p) stop("length(sb) must match the number of covariates.")
+  else if   (!all(sb)    > 0) stop(paste0("Beta prior variance-covariance matrix must be positive definite. ",
+                                   "Check that all(sb > 0)."))
 
   ### 4.3.2 Dirichlet prior
   if (is.null(dir_pr_parm)) {
@@ -133,12 +133,12 @@ bspgldrmFit <- function(X, y,                               # Data
   ## 5. MCMC loop
   for (r in 2:iter) {
     ### 5.1 Beta update
-    Sig <- Sigma_beta(X, mu, bpr2, rho, linkfun, mu.eta)
+    Sig   <- Sigma_beta(X, mu, bpr2, rho, linkfun, mu.eta)
     b_out <- ifelse(joint.update,
                     beta_update_joint(X, y, spt, beta, Sig, f0,
-                                      tht, bpr2, btht, rho, linkinv),
+                                      tht, bpr2, btht, rho, linkinv, mb, sb),
                     beta_update_separate(X, y, spt, beta, Sig, f0,
-                                         tht, bpr2, btht, rho, linkinv))
+                                         tht, bpr2, btht, rho, linkinv, mb, sb))
     beta <- b_out$cr_bt
     tht  <- b_out$cr_tht
     btht <- b_out$cr_btht
