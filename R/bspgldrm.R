@@ -115,10 +115,13 @@ bspgldrm <- function(formula, data=NULL, link="log", mb=NULL, sb=NULL, dir_pr_pa
 
   ## 4. Output
   out <- list(
-    samples = fit$samples,
-    formula = formula,
-    data    = data.frame(mf),
-    link    = link
+    samples     = fit$samples,
+    mb          = fit$mb,
+    sb          = fit$sb,
+    dir_pr_parm = fit$dir_pr_parm,
+    formula     = formula,
+    data        = data.frame(mf),
+    link        = link
   )
   class(out) <- "bspgldrm"
   out

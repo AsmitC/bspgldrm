@@ -164,7 +164,10 @@ bspgldrmFit <- function(X, y,                               # Data
   }
 
   ## 6. Output
-  list(samples = list(beta = beta_samples,
-                      f0   = f0_samples))
+  list(samples     = list(beta = beta_samples,
+                          f0   = f0_samples),
+       mb          = mb,
+       sb          = sb,
+       dir_pr_parm = dir_pr_parm)
 }
 
