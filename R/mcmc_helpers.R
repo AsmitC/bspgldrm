@@ -154,8 +154,8 @@ f0_update <- function(y,
       pr_llik <- sum(pr_tht * y - pr_btht + log(pr_f0y))
       cr_llik <- sum(cr_tht * y - cr_btht + log(cr_f0y))
 
-      pr_pf0 <- ddirichlet(pr_f0, dir_pr_parm, log = T)
-      cr_pf0 <- ddirichlet(cr_f0, dir_pr_parm, log = T)
+      pr_pf0 <- ddirichlet(pr_f0, dir_pr_parm, log = T)                   # prior probability (proposal)
+      cr_pf0 <- ddirichlet(cr_f0, dir_pr_parm, log = T)                   # prior probabability (current)
       cr_qf0 <- ddirichlet(cr_f0, pr_dir_parm, log = T)
       pr_qf0 <- ddirichlet(pr_f0, cr_dir_parm, log = T)
 
@@ -200,6 +200,8 @@ f0_update <- function(y,
 #' @export
 #'
 #' @examples
+#'
+# add p.beta as a required arg
 beta_update_joint <- function(X,
                               y,
                               spt,
@@ -210,7 +212,8 @@ beta_update_joint <- function(X,
                               cr_bpr2,
                               cr_btht,
                               rho,
-                              linkinv) {
+                              linkinv,
+                              p.beta) {
   n <- dim(X)[1]
   l <- length(spt)
 
@@ -227,8 +230,8 @@ beta_update_joint <- function(X,
 
     pr_llik <- sum(pr_tht * y - pr_btht)
     cr_llik <- sum(cr_tht * y - cr_btht)
-    pr_pbt <- dmvnorm(pr_bt, log = T)                # Prior probability (for proposal)?
-    cr_pbt <- dmvnorm(cr_bt, log = T)                # Prior probability (for current)?
+    pr_pbt <- dmvnorm(pr_bt, log = T)                # Prior probability (for proposal)? add mean=mb, sigma=diag(sb)
+    cr_pbt <- dmvnorm(cr_bt, log = T)                # Prior probability (for current)? add mean=mb, sigma=diag(sb)
     cr_qbt <- dmvnorm(cr_bt,
                       mean = pr_bt,
                       sigma = pr_Sig,
@@ -286,7 +289,8 @@ beta_update_separate <- function(X,
                                  cr_bpr2,
                                  cr_btht,
                                  rho,
-                                 linkinv) {
+                                 linkinv,
+                                 p.beta) {
   n <- dim(X)[1]
   p <- dim(X)[2]
   l <- length(spt)
@@ -296,7 +300,7 @@ beta_update_separate <- function(X,
     pr_bt <- cr_bt
     pr_bt[j] <- cr_bt[j] + rnorm(1, mean = 0, sd = cr_sd[j])
     # pr_mu <- exp(X %*% pr_bt) %>% as.numeric()     # due to log link: g^{-1}(y) = exp(y)
-    pr_mu <- as.numeric(linkinv(X %*% or_bt))        # Updated for general link
+    pr_mu <- as.numeric(linkinv(X %*% pr_bt))        # Updated for general link
 
     if (sum(spt[1] <= pr_mu & pr_mu <= spt[l]) == n) {
       out <- tht_sol(spt, cr_f0, pr_mu, cr_tht)
@@ -308,7 +312,7 @@ beta_update_separate <- function(X,
 
       pr_llik <- sum(pr_tht * y - pr_btht)
       cr_llik <- sum(cr_tht * y - cr_btht)
-      pr_pbt <- dnorm(pr_bt[j], log = T)              # Prior probability (for proposal)?
+      pr_pbt <- dnorm(pr_bt[j], log = T)              # Prior probability (for proposal)? dnorm(mean=mb[j], sigma=sqrt(sb[j]))
       cr_pbt <- dnorm(cr_bt[j], log = T)              # Prior probability (for current)?
       cr_qbt <- dnorm(cr_bt[j],
                       mean = pr_bt[j],

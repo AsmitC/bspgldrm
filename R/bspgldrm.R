@@ -57,8 +57,9 @@
 #' fit2
 #'
 #' @export
-bspgldrm <- function(formula, data=NULL, link="log",
+bspgldrm <- function(formula, data=NULL, link="log", mb=NULL, sb=NULL, dir_pr_parm=NULL,
                      bspgldrmControl=bspgldrm.control(), thetaControl=theta.control())
+
 {
   ## 1. Model initialization
   mf <- stats::model.frame(formula, data)
@@ -67,20 +68,47 @@ bspgldrm <- function(formula, data=NULL, link="log",
   y  <- stats::model.response(mf, type = "numeric")
 
   ## 2. Extract link
+  test.vectorized <- TRUE
   if (is.character(link)) {
+    test.vectorized <- FALSE
     link <- stats::make.link(link)
   } else if (!is.list(link) ||
              !all(c("linkfun", "linkinv", "mu.eta") %in% names(link))) {
     stop("link must be a string or a list containing linkfun, linkinv, mu.eta")
   }
 
+  ### 2.1 Check that all link functions are vectorized
+  linkfun <- link$linkfun
+  linkinv <- link$linkinv
+  mu.eta  <- link$mu.eta
+
+  if (test.vectorized) { # User has specified a custom link
+    is.vectorized <- function(f, data) {
+      out <- tryCatch(f(test.vals),
+                      error   = function(e) e,
+                      warning = function(w) w)
+      if (inherits(out, "error") || inherits(out, "warning")) return(FALSE)
+      is.atomic(out) && length(out) == length(test.vals)
+    }
+
+    linkfun.testdata <-rep(mean(y), 3)           # Domain of linkfun based on mu
+    inveta.testdata <- seq(-1, 1, length.out=3)  # Domain of linkinv, mu.eta based on eta
+
+    if (!is.vectorized(linkfun, linkfun.testdata) ||
+        !is.vectorized(linkinv, inveta.testdata)  ||
+        !is.vectorized(mu.eta, inveta.testdata)) stop(paste0("link must be vectorized."))
+  }
+
   ## 3. Call MCMC helper
   fit <- bspgldrmFit(
     X                    = X,
     y                    = y,
-    linkfun              = link$linkfun,
-    linkinv              = link$linkinv,
-    mu.eta               = link$mu.eta,
+    linkfun              = linkfun,
+    linkinv              = linkinv,
+    mu.eta               = mu.eta,
+    mb                   = mb,
+    sb                   = sb,
+    dir_pr_parm          = dir_pr_parm,
     bspgldrmControl      = bspgldrmControl,
     thetaControl         = thetaControl
   )

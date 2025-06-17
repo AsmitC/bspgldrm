@@ -23,7 +23,7 @@
 #' @return Object of S3 class "bspgldrmControl"
 #'
 #' @export
-bspgldrm.control <- function(burnin=1000, thin=1, save=5000, rho=0.1, mu0=NULL,
+bspgldrm.control <- function(burnin=1000, thin=1, save=1000, rho=0.1, mu0=NULL,
                              betaStart=NULL, f0Start=NULL, joint.update=TRUE)
 {
   if (burnin < 0)            stop("Number of burn-in samples must be >= 0")
@@ -37,7 +37,7 @@ bspgldrm.control <- function(burnin=1000, thin=1, save=5000, rho=0.1, mu0=NULL,
                mu0         = mu0,
                betaStart   = betaStart,
                f0Start     = f0Start,
-               joint.update= joint.update,)
+               joint.update= joint.update)
   class(ctrl) <- "bspgldrmControl"
   ctrl
 }
@@ -47,23 +47,24 @@ bspgldrm.control <- function(burnin=1000, thin=1, save=5000, rho=0.1, mu0=NULL,
 #' This function is called by the main \code{bspgldrm} function.
 #'
 #' @keywords internal
-bspgldrmFit <- function(X, y,
-                        linkfun, linkinv, mu.eta,
-                        control, thetaControl)
+bspgldrmFit <- function(X, y,                               # Data
+                        linkfun, linkinv, mu.eta,           # Link
+                        mb, sb, dir_pr_parm,                # Priors
+                        bspgldrmControl, thetaControl)      # Controls
 {
-  ## 1. Extract control parameters
-  burnin       <- control$burnin
-  thin         <- control$thin
-  save         <- control$save
-  rho          <- control$rho
-  mu0          <- control$mu0
-  joint.update <- control$joint.update
-  betaStart    <- control$betaStart
-  f0Start      <- control$f0Start
+  ## 1. Extract bspgldrmControl parameters
+  burnin       <- bspgldrmControl$burnin
+  thin         <- bspgldrmControl$thin
+  save         <- bspgldrmControl$save
+  rho          <- bspgldrmControl$rho
+  mu0          <- bspgldrmControl$mu0
+  joint.update <- bspgldrmControl$joint.update
+  betaStart    <- bspgldrmControl$betaStart
+  f0Start      <- bspgldrmControl$f0Start
 
   spt <- sort(unique(y)) ## Observed support
 
-  ## 2. Initialize mu0 if not provided by the user
+  ## 3. Initialize mu0 if not provided by the user
   if (is.null(mu0)) {
     mu0 <- mean(y)
   } else if (mu0 <= min(spt) || mu0 >= max(spt)) {
@@ -71,7 +72,7 @@ bspgldrmFit <- function(X, y,
                 "value or set mu0=NULL to use the default value, mean(y)."))
   }
 
-  ## 3. MCMC Initialization
+  ## 4. MCMC Initialization
   if (is.null(betaStart) || is.null(f0Start)) {
     ### Fit gldrm by default
     gfit <- gldrm(formula      = formula,
@@ -91,7 +92,7 @@ bspgldrmFit <- function(X, y,
   l    <- length(spt)
   iter <- burnin + thin * save
 
-  ### 3.1 Beta and f0
+  ### 4.2 Beta and f0
   beta_samples <- matrix(NA, nrow = save, ncol = p)
   f0_samples   <- matrix(NA, nrow = save, ncol = l)
 
@@ -100,24 +101,38 @@ bspgldrmFit <- function(X, y,
   beta_samples[1, ] <- beta
   f0_samples[1, ]   <- f0
 
-  ### 3.2 Dirichlet prior
-  ind_mt      <- outer(y, spt, `==`) * 1
-  alpha       <- 1
-  dir_pr_parm <- alpha * colMeans(ind_mt)
-  eps         <- 1e-6
-  dir_pr_parm <- dir_pr_parm + eps
+  ### 4.3 Validate priors
 
-  # 3.3 Theta
-  mu      <- linkinv(X %*% beta)                    # Updated for general link
+  ### 4.3.1 Beta prior
+  if (is.null(p.beta)) {
+    mb <- rep(0, p)
+    sb <- rep(1, p)
+  } else if (length(mb) != p) stop("length(mb) must match the number of covariates.")
+  else if (length(sb) != p) stop("length(sb) must match the number of covariates.")
+  else if (!all(sb) > 0) stop("Beta prior variance-covariance matrix must be positive definite.
+                              Check that all(sb > 0).")
+
+  ### 4.3.2 Dirichlet prior
+  if (is.null(dir_pr_parm)) {
+    ind_mt      <- outer(y, spt, `==`) * 1
+    alpha       <- 1
+    dir_pr_parm <- alpha * colMeans(ind_mt)
+    eps         <- 1e-6
+    dir_pr_parm <- dir_pr_parm + eps
+  } else if (!all(dir_pr_parm > 0) ||
+             length(dir_pr_parm) != l) stop("dir_pr_parm must be positive with K atoms.")
+
+  ### 4.4 Theta
+  mu      <- linkinv(X %*% beta)                   # Updated for general link
   out     <- tht_sol(spt, f0, mu, NULL)
   tht     <- out$tht
   btht    <- out$btht
   bpr2    <- out$bpr2
   f0_y    <- f0y(y, spt, f0)
 
-  ## 4. MCMC loop
+  ## 5. MCMC loop
   for (r in 2:iter) {
-    ### 4.1 Beta update
+    ### 5.1 Beta update
     Sig <- Sigma_beta(X, mu, bpr2, rho, linkfun, mu.eta)
     b_out <- ifelse(joint.update,
                     beta_update_joint(X, y, spt, beta, Sig, f0,
@@ -130,7 +145,7 @@ bspgldrmFit <- function(X, y,
     bpr2 <- b_out$cr_bpr2
     mu   <- linkinv(X %*% beta)                   # Updated for general link
 
-    ### 4.2 f0 update
+    ### 5.2 f0 update
     propsl_dir_parm <- dir_parm(y, tht, btht, dir_pr_parm, ind_mt)
     out             <- f0_update(y, spt, f0, f0_y, propsl_dir_parm,
                                  mu, tht, bpr2, btht, dir_pr_parm, ind_mt)
@@ -140,7 +155,7 @@ bspgldrmFit <- function(X, y,
     btht  <- out$cr_btht
     bpr2  <- out$cr_bpr2
 
-    # 4.3 Storage
+    # 5.3 Storage
     if (r > burnin & r %% thin == 0) {
       j <- (r - burnin) / thin
       beta_samples[j, ] <- beta
@@ -148,7 +163,7 @@ bspgldrmFit <- function(X, y,
     }
   }
 
-  ## 5. Output
+  ## 6. Output
   list(samples = list(beta = beta_samples,
                       f0   = f0_samples))
 }
