@@ -4,7 +4,18 @@
 \alias{bspgldrmFit}
 \title{Main MCMC function}
 \usage{
-bspgldrmFit(X, y, linkfun, linkinv, mu.eta, control, thetaControl)
+bspgldrmFit(
+  X,
+  y,
+  linkfun,
+  linkinv,
+  mu.eta,
+  mb,
+  sb,
+  dir_pr_parm,
+  bspgldrmControl,
+  thetaControl
+)
 }
 \description{
 This function is called by the main \code{bspgldrm} function.

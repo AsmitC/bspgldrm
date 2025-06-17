@@ -19,3 +19,4 @@ f0y(y, spt, f0)
 \description{
 Title: function for calculating \{f0(y_i), i = 1(1)n\}
 }
+\keyword{internal}

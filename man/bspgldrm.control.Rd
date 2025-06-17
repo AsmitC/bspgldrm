@@ -7,8 +7,8 @@
 bspgldrm.control(
   burnin = 1000,
   thin = 1,
-  save = 5000,
-  rho = 1,
+  save = 1000,
+  rho = 0.1,
   mu0 = NULL,
   betaStart = NULL,
   f0Start = NULL,

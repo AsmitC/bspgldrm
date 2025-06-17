@@ -15,7 +15,9 @@ beta_update_separate(
   cr_bpr2,
   cr_btht,
   rho,
-  linkinv
+  linkinv,
+  mb,
+  sb
 )
 }
 \arguments{
@@ -42,3 +44,4 @@ beta_update_separate(
 \description{
 Title: function for updating beta (one at a time)
 }
+\keyword{internal}

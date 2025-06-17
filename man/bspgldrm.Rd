@@ -8,6 +8,9 @@ bspgldrm(
   formula,
   data = NULL,
   link = "log",
+  mb = NULL,
+  sb = NULL,
+  dir_pr_parm = NULL,
   bspgldrmControl = bspgldrm.control(),
   thetaControl = theta.control()
 )

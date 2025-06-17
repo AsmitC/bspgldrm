@@ -12,9 +12,7 @@
 #' 1. bpr2 (vector) \{second derivative of b(theta_i), i=1(1)n\}
 #' 2. tht (vector) derived parameter theta = \{theta_i = function(beta, f0, x_i), i=1(1)n\}
 #' 3. btht (vector)  normalizing constant b(theta) = \{b(theta_i), i=1(1)n\}
-#' @export
-#'
-#' @examples
+#' @keywords internal
 
 tht_sol <- function(spt, f0, mu, thtst) {
   out <- gldrm:::getTheta(
@@ -43,9 +41,7 @@ tht_sol <- function(spt, f0, mu, thtst) {
 #' @param ind_mt indicator matrix with (i,j)th element: 1(y_i == s_j)
 #'
 #' @return (vector) dirichlet proposal parameter
-#' @export
-#'
-#' @examples
+#' @keywords internal
 
 dir_parm <- function(y, tht, btht, dir_pr_parm, ind_mt) {
   wgt <- (1 / exp(tht * y - btht)) %>% `/` (sum(.)) %>% as.numeric()
@@ -62,9 +58,7 @@ dir_parm <- function(y, tht, btht, dir_pr_parm, ind_mt) {
 #' @param f0 (vector) \{f0(s_j), j=1(1)l\}: free parameter, f0(.) centering density
 #'
 #' @return (vector) \{f0(y_i), i=1(1)n\}
-#' @export
-#'
-#' @examples
+#' @keywords internal
 
 f0y <- function(y, spt, f0) {
   n <- length(y)
@@ -87,9 +81,7 @@ f0y <- function(y, spt, f0) {
 #' @param rho MCMC update step size, a (scalar) in (0, 1]
 #'
 #' @return variance-covariance (matrix) of beta
-#' @export
-#'
-#' @examples
+#' @keywords internal
 
 Sigma_beta <- function(X, mu, bpr2, rho, linkfun, mu.eta) {
   eta <- linkfun(mu)
@@ -119,10 +111,7 @@ Sigma_beta <- function(X, mu, bpr2, rho, linkfun, mu.eta) {
 #' @param dir_pr_parm dirichlet prior parameter
 #' @param ind_mt indicator matrix with (i,j)th element: 1(y_i == s_j)
 #'
-#' @return
-#' @export
-#'
-#' @examples
+#' @keywords internal
 
 f0_update <- function(y,
                       spt,
@@ -196,12 +185,7 @@ f0_update <- function(y,
 #' @param cr_btht current b(theta)
 #' @param rho MCMC update step size, a (scalar) in (0, 1]
 #'
-#' @return
-#' @export
-#'
-#' @examples
-#'
-# add p.beta as a required arg
+#' @keywords internal
 beta_update_joint <- function(X,
                               y,
                               spt,
@@ -284,10 +268,7 @@ beta_update_joint <- function(X,
 #' @param cr_btht current b(theta)
 #' @param rho MCMC update step size, a (scalar) in (0, 1]
 #'
-#' @return
-#' @export
-#'
-#' @examples
+#' @keywords internal
 beta_update_separate <- function(X,
                                  y,
                                  spt,

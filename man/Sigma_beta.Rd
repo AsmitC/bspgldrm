@@ -21,3 +21,4 @@ variance-covariance (matrix) of beta
 \description{
 Title: function for finding variance-covariance matrix of beta
 }
+\keyword{internal}

@@ -23,3 +23,4 @@ dir_parm(y, tht, btht, dir_pr_parm, ind_mt)
 \description{
 Title: function for finding dirichlet proposal parameter
 }
+\keyword{internal}

@@ -26,3 +26,4 @@ tht_sol(spt, f0, mu, thtst)
 \description{
 Title: function for finding theta, btheta & bprime2
 }
+\keyword{internal}

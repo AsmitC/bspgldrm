@@ -15,7 +15,9 @@ beta_update_joint(
   cr_bpr2,
   cr_btht,
   rho,
-  linkinv
+  linkinv,
+  mb,
+  sb
 )
 }
 \arguments{
@@ -42,3 +44,4 @@ beta_update_joint(
 \description{
 Title : function for updating beta (jointly)
 }
+\keyword{internal}
