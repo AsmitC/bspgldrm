@@ -10,19 +10,20 @@ bspgldrm.control(
   save = 1000,
   rho = 0.1,
   mu0 = NULL,
+  spt = NULL,
   betaStart = NULL,
   f0Start = NULL,
   joint.update = TRUE
 )
 }
 \arguments{
-\item{burnin}{Number of burn-in MCMC iterations. Defaults to 1000.}
+\item{burnin}{Number of burn-in MCMC iterations. Defaults to 100.}
 
-\item{thin}{Factor by which to thin MCMC iterations. Defaults to 1.}
+\item{thin}{Factor by which to thin MCMC iterations. Defaults to 10.}
 
-\item{save}{Number of MCMC samples to return. Defaults to 5000.}
+\item{save}{Number of MCMC samples to return. Defaults to 1000.}
 
-\item{rho}{MCMC update step size, a (scalar) in (0, 1]. Defaults to 1.}
+\item{rho}{MCMC update step size, a (scalar) in (0, 1]. Defaults to 0.1.}
 
 \item{mu0}{Mean of the reference distribution. The reference distribution is
 not unique unless its mean is restricted to a specific value. This value can
@@ -30,13 +31,15 @@ be any number within the range of observed values, but values near the boundary
 may cause numerical instability. This is an optional argument with \code{mean(y)}
 being the default value.}
 
+\item{spt}{Theoretical support of the response variable.}
+
 \item{betaStart}{Initial value for the regression coefficients \code{beta}.
 Defaults to the output obtained by fitting \code{gldrm}.}
 
 \item{f0Start}{Initial value for the reference distribution \code{f0}.
 Defaults to the output obtained by fitting \code{gldrm}.}
 
-\item{joint.update}{Logical specifying whether to update beta jointly or separately.
+\item{joint.update}{Logical indicating whether to update beta jointly.
 Defaults to \code{TRUE}}
 }
 \value{

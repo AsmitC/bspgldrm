@@ -29,6 +29,15 @@ Alternatively, \code{link} can be a list containing three functions named
 function. The second is the inverse link function. The third is the derivative
 of the inverse link function. All three functions must be vectorized.}
 
+\item{mb}{Prior mean for beta. Defaults to a p-length vector whose entries are all 0.}
+
+\item{sb}{Vector containing the diagonal entries of the prior variance-covariance
+matrix for beta. Defaults to the p-dimensional identity matrix.}
+
+\item{dir_pr_parm}{Dirichlet prior parameter for f0. Defaults to the observed
+response frequency distribution. If specified, it should be a p-length vector
+with positive entries.}
+
 \item{bspgldrmControl}{Optional control arguments.
 Passed as an object of class "bspgldrmControl", which is constructed by the
 \code{bspgldrm.control} function.
@@ -52,7 +61,10 @@ mirror the "link-glm" class. Objects of this class can be created with the
 
 The "bspgldrm" class is a list of the following items.
 \itemize{
-\item \code{samples} A list containing the MCMC samples for \code{f0} and \code{beta}
+\item \code{samples} A list containing the MCMC samples for \code{f0} and \code{beta}.
+\item \code{mb} Prior mean for beta.
+\item \code{sb} Diagonal entries of the prior variance-covariance matrix for beta.
+\item \code{dir_pr_parm} Dirichlet prior parameter.
 \item \code{formula} Model formula.
 \item \code{data} Model data frame.
 \item \code{link} Link function. If a character string was passed to the
