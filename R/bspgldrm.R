@@ -14,6 +14,12 @@
 #' \code{linkfun}, \code{linkinv}, and \code{mu.eta}. The first is the link
 #' function. The second is the inverse link function. The third is the derivative
 #' of the inverse link function. All three functions must be vectorized.
+#' @param mb Prior mean for beta. Defaults to a p-length vector whose entries are all 0.
+#' @param sb Vector containing the diagonal entries of the prior variance-covariance
+#' matrix for beta. Defaults to the p-dimensional identity matrix.
+#' @param dir_pr_parm Dirichlet prior parameter for f0. Defaults to the observed
+#' response frequency distribution. If specified, it should be a p-length vector
+#' with positive entries.
 #' @param bspgldrmControl Optional control arguments.
 #' Passed as an object of class "bspgldrmControl", which is constructed by the
 #' \code{bspgldrm.control} function.
@@ -31,7 +37,10 @@
 #'
 #'The "bspgldrm" class is a list of the following items.
 #' \itemize{
-#' \item \code{samples} A list containing the MCMC samples for \code{f0} and \code{beta}
+#' \item \code{samples} A list containing the MCMC samples for \code{f0} and \code{beta}.
+#' \item \code{mb} Prior mean for beta.
+#' \item \code{sb} Diagonal entries of the prior variance-covariance matrix for beta.
+#' \item \code{dir_pr_parm} Dirichlet prior parameter.
 #' \item \code{formula} Model formula.
 #' \item \code{data} Model data frame.
 #' \item \code{link} Link function. If a character string was passed to the
@@ -101,11 +110,10 @@ bspgldrm <- function(formula, data=NULL, link="log", mb=NULL, sb=NULL, dir_pr_pa
 
   ## 3. Call MCMC helper
   fit <- bspgldrmFit(
+    formula              = formula,
     X                    = X,
     y                    = y,
-    linkfun              = linkfun,
-    linkinv              = linkinv,
-    mu.eta               = mu.eta,
+    link                 = link,
     mb                   = mb,
     sb                   = sb,
     dir_pr_parm          = dir_pr_parm,
@@ -113,7 +121,26 @@ bspgldrm <- function(formula, data=NULL, link="log", mb=NULL, sb=NULL, dir_pr_pa
     thetaControl         = thetaControl
   )
 
-  ## 4. Output
+  ## 4. Tilt each f0 sample
+  f0_samples <- fit$samples$f0
+  f0star_samples <- matrix(0, nrow = nrow(f0_samples), ncol = length(spt))
+  for (iter in 1:nrow(f0_samples)) {
+    wh <- f0_samples[iter, ]
+    theta0 <- gldrm:::getTheta(
+      spt = spt,
+      f0 = wh,
+      mu = mu0,
+      sampprobs = NULL,
+      ySptIndex = NULL
+    )$theta
+    wh <- wh * exp(theta0 * spt)
+    wh <- wh / sum(wh)
+    f0star_samples[iter, ] <- wh
+  }
+  f0_samples <- f0star_samples  # projected f0 samples
+  fit$samples$f0 <- f0_samples
+
+  ## 5. Output
   out <- list(
     samples     = fit$samples,
     mb          = fit$mb,

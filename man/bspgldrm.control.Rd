@@ -5,8 +5,8 @@
 \title{Control arguments for the \code{bspgldrm} algorithm.}
 \usage{
 bspgldrm.control(
-  burnin = 1000,
-  thin = 1,
+  burnin = 100,
+  thin = 10,
   save = 1000,
   rho = 0.1,
   mu0 = NULL,

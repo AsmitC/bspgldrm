@@ -14,3 +14,7 @@ BugReports: https://github.com/AsmitC/bspgldrm/issues
 Imports: 
     gldrm,
     mvtnorm
+Suggests: 
+    knitr,
+    rmarkdown
+VignetteBuilder: knitr

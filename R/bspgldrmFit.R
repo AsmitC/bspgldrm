@@ -4,26 +4,27 @@
 #' Each argument has a default value, which will be used unless a different
 #' value is provided by the user.
 #'
-#' @param burnin Number of burn-in MCMC iterations. Defaults to 1000.
-#' @param thin Factor by which to thin MCMC iterations. Defaults to 1.
-#' @param save Number of MCMC samples to return. Defaults to 5000.
-#' @param rho MCMC update step size, a (scalar) in (0, 1]. Defaults to 1.
+#' @param burnin Number of burn-in MCMC iterations. Defaults to 100.
+#' @param thin Factor by which to thin MCMC iterations. Defaults to 10.
+#' @param save Number of MCMC samples to return. Defaults to 1000.
+#' @param rho MCMC update step size, a (scalar) in (0, 1]. Defaults to 0.1.
 #' @param mu0 Mean of the reference distribution. The reference distribution is
 #' not unique unless its mean is restricted to a specific value. This value can
 #' be any number within the range of observed values, but values near the boundary
 #' may cause numerical instability. This is an optional argument with \code{mean(y)}
 #' being the default value.
+#' @param spt Theoretical support of the response variable.
 #' @param betaStart Initial value for the regression coefficients \code{beta}.
 #' Defaults to the output obtained by fitting \code{gldrm}.
 #' @param f0Start Initial value for the reference distribution \code{f0}.
 #' Defaults to the output obtained by fitting \code{gldrm}.
-#' @param joint.update Logical specifying whether to update beta jointly or separately.
+#' @param joint.update Logical indicating whether to update beta jointly.
 #' Defaults to \code{TRUE}
 #'
 #' @return Object of S3 class "bspgldrmControl"
 #'
 #' @export
-bspgldrm.control <- function(burnin=1000, thin=1, save=1000, rho=0.1, mu0=NULL,
+bspgldrm.control <- function(burnin=100, thin=10, save=1000, rho=0.1, mu0=NULL, spt=NULL,
                              betaStart=NULL, f0Start=NULL, joint.update=TRUE)
 {
   if (burnin < 0)            stop("Number of burn-in samples must be >= 0")
@@ -35,6 +36,7 @@ bspgldrm.control <- function(burnin=1000, thin=1, save=1000, rho=0.1, mu0=NULL,
                save        = save,
                rho.        = rho,
                mu0         = mu0,
+               spt         = spt,
                betaStart   = betaStart,
                f0Start     = f0Start,
                joint.update= joint.update)
@@ -47,8 +49,8 @@ bspgldrm.control <- function(burnin=1000, thin=1, save=1000, rho=0.1, mu0=NULL,
 #' This function is called by the main \code{bspgldrm} function.
 #'
 #' @keywords internal
-bspgldrmFit <- function(X, y,                               # Data
-                        linkfun, linkinv, mu.eta,           # Link
+bspgldrmFit <- function(formula, X, y,                      # Data
+                        link,                               # Link
                         mb, sb, dir_pr_parm,                # Priors
                         bspgldrmControl, thetaControl)      # Controls
 {
@@ -58,11 +60,21 @@ bspgldrmFit <- function(X, y,                               # Data
   save         <- bspgldrmControl$save
   rho          <- bspgldrmControl$rho
   mu0          <- bspgldrmControl$mu0
+  spt          <- bspgldrmControl$spt
   joint.update <- bspgldrmControl$joint.update
   betaStart    <- bspgldrmControl$betaStart
   f0Start      <- bspgldrmControl$f0Start
 
-  spt <- sort(unique(y)) ## Observed support
+  ## 1.1 Extract link
+  linkfun <- link$linkfun
+  linkinv <- link$linkinv
+  mu.eta  <- link$mu.eta
+
+  ## 2. Initialize (theoretical) support if not provided by the user
+  if (is.null(spt)){
+    spt <- sort(unique(y)) ## Observed support
+  }
+  l    <- length(spt)
 
   ## 3. Initialize mu0 if not provided by the user
   if (is.null(mu0)) {
@@ -73,26 +85,34 @@ bspgldrmFit <- function(X, y,                               # Data
   }
 
   ## 4. MCMC Initialization
-  if (is.null(betaStart) || is.null(f0Start)) {
-    ### Fit gldrm by default
+  if (is.null(betaStart)) {
     gfit <- gldrm(formula      = formula,
                   data         = data,
                   link         = link,
                   mu0          = mu0,
-                  gldrmControl = gldrm.control(),
                   thetaControl = thetaControl)
-    if (is.null(betaStart)) betaStart <- gfit$beta
-    if (is.null(f0Start))   f0Start   <- gfit$f0
+    betaStart <- gfit$beta
+  }
+
+  if (is.null(f0Start)) {
+    f0      <- rep(1 / l, l)
+    tht0    <- gldrm:::getTheta(
+      spt       = spt,
+      f0        = f0,
+      mu        = mu0,
+      sampprobs = NULL,
+      ySptIndex = NULL
+    )$theta
+    f0star  <- (f0 * exp(tht0 * spt)) %>% `/` (sum(.))
+    f0Start <- f0star
   }
 
   init <- list(beta = betaStart, f0 = f0Start)
   X    <- as.matrix(X)
   n    <- length(y)
   p    <- ncol(X)
-  l    <- length(spt)
   iter <- burnin + thin * save
 
-  ### 4.2 Beta and f0
   beta_samples <- matrix(NA, nrow = save, ncol = p)
   f0_samples   <- matrix(NA, nrow = save, ncol = l)
 
@@ -101,18 +121,18 @@ bspgldrmFit <- function(X, y,                               # Data
   beta_samples[1, ] <- beta
   f0_samples[1, ]   <- f0
 
-  ### 4.3 Validate priors
+  ### 4.1 Validate priors
 
-  ### 4.3.1 Beta prior
-  if (is.null(p.beta)) {
-    mb <- rep(0, p)
-    sb <- rep(1, p)
+  ### 4.1.1 Beta prior
+  if (is.null(mb) || is.null(sb)) {
+    if (is.null(mb)) mb <- rep(0, p)
+    if (is.null(sb)) sb <- rep(1, p)
   } else if (length(mb) != p) stop("length(mb) must match the number of covariates.")
   else if   (length(sb) != p) stop("length(sb) must match the number of covariates.")
   else if   (!all(sb)    > 0) stop(paste0("Beta prior variance-covariance matrix must be positive definite. ",
                                    "Check that all(sb > 0)."))
 
-  ### 4.3.2 Dirichlet prior
+  ### 4.1.2 Dirichlet prior
   if (is.null(dir_pr_parm)) {
     ind_mt      <- outer(y, spt, `==`) * 1
     alpha       <- 1
@@ -122,7 +142,7 @@ bspgldrmFit <- function(X, y,                               # Data
   } else if (!all(dir_pr_parm > 0) ||
              length(dir_pr_parm) != l) stop("dir_pr_parm must be positive with K atoms.")
 
-  ### 4.4 Theta
+  ### 4.2 Theta
   mu      <- linkinv(X %*% beta)                   # Updated for general link
   out     <- tht_sol(spt, f0, mu, NULL)
   tht     <- out$tht
@@ -134,11 +154,15 @@ bspgldrmFit <- function(X, y,                               # Data
   for (r in 2:iter) {
     ### 5.1 Beta update
     Sig   <- Sigma_beta(X, mu, bpr2, rho, linkfun, mu.eta)
-    b_out <- ifelse(joint.update,
-                    beta_update_joint(X, y, spt, beta, Sig, f0,
-                                      tht, bpr2, btht, rho, linkinv, mb, sb),
-                    beta_update_separate(X, y, spt, beta, Sig, f0,
-                                         tht, bpr2, btht, rho, linkinv, mb, sb))
+    if (joint.update) {
+      b_out <- beta_update_joint(X, y, spt, beta, Sig, f0, tht,
+                                 bpr2, btht, rho, linkfun, linkinv,
+                                 mu.eta, mb, sb)
+    } else {
+      b_out <- beta_update_separate(X, y, spt, beta, Sig, f0, tht,
+                                     bpr2, btht, rho, linkfun, linkinv,
+                                     mu.eta, mb, sb)
+    }
     beta <- b_out$cr_bt
     tht  <- b_out$cr_tht
     btht <- b_out$cr_btht

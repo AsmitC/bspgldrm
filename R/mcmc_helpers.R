@@ -96,7 +96,6 @@ Sigma_beta <- function(X, mu, bpr2, rho, linkfun, mu.eta) {
 }
 
 
-
 #' Title: function for updating f0
 #'
 #' @param y response variable
@@ -112,7 +111,6 @@ Sigma_beta <- function(X, mu, bpr2, rho, linkfun, mu.eta) {
 #' @param ind_mt indicator matrix with (i,j)th element: 1(y_i == s_j)
 #'
 #' @keywords internal
-
 f0_update <- function(y,
                       spt,
                       cr_f0,
@@ -196,7 +194,9 @@ beta_update_joint <- function(X,
                               cr_bpr2,
                               cr_btht,
                               rho,
+                              linkfun,
                               linkinv,
+                              mu.eta,
                               mb,
                               sb) {
   n <- dim(X)[1]
@@ -211,19 +211,19 @@ beta_update_joint <- function(X,
     pr_bpr2 <- out$bpr2
     pr_tht <- out$tht
     pr_btht <- out$btht
-    pr_Sig <- Sigma_beta(X, pr_mu, pr_bpr2, rho)
+    pr_Sig <- Sigma_beta(X, pr_mu, pr_bpr2, rho, linkfun, mu.eta)
 
     pr_llik <- sum(pr_tht * y - pr_btht)
     cr_llik <- sum(cr_tht * y - cr_btht)
     # pr_pbt <- dmvnorm(pr_bt, log = T) # Prior probability (for proposal)
     pr_pbt <- dmvnorm(pr_bt,            # Updated
                       mean = mb,
-                      sigma = sb,
+                      sigma = diag(sb),
                       log = T)
     # cr_pbt <- dmvnorm(cr_bt, log = T) # Prior probability (for current)
     cr_pbt <- dmvnorm(cr_bt,            # Updated
                       mean = mb,
-                      sigma = sb,
+                      sigma = diag(sb),
                       log = T)
     cr_qbt <- dmvnorm(cr_bt,
                       mean = pr_bt,
@@ -279,7 +279,9 @@ beta_update_separate <- function(X,
                                  cr_bpr2,
                                  cr_btht,
                                  rho,
+                                 linkfun,
                                  linkinv,
+                                 mu.eta,
                                  mb,
                                  sb) {
   n <- dim(X)[1]
@@ -298,7 +300,7 @@ beta_update_separate <- function(X,
       pr_tht <- out$tht
       pr_btht <- out$btht
       pr_bpr2 <- out$bpr2
-      pr_Sig <- Sigma_beta(X, pr_mu, pr_bpr2, rho)
+      pr_Sig <- Sigma_beta(X, pr_mu, pr_bpr2, rho, linkfun, mu.eta)
       pr_sd <- sqrt(diag(pr_Sig))
 
       pr_llik <- sum(pr_tht * y - pr_btht)

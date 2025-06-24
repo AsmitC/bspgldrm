@@ -15,7 +15,9 @@ beta_update_joint(
   cr_bpr2,
   cr_btht,
   rho,
+  linkfun,
   linkinv,
+  mu.eta,
   mb,
   sb
 )

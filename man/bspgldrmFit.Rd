@@ -5,11 +5,10 @@
 \title{Main MCMC function}
 \usage{
 bspgldrmFit(
+  formula,
   X,
   y,
-  linkfun,
-  linkinv,
-  mu.eta,
+  link,
   mb,
   sb,
   dir_pr_parm,
