@@ -100,8 +100,8 @@ bspgldrm <- function(formula, data=NULL, link="log", mb=NULL, sb=NULL, dir_pr_pa
       is.atomic(out) && length(out) == length(test.vals)
     }
 
-    linkfun.testdata <-rep(mean(y), 3)           # Domain of linkfun based on mu
-    inveta.testdata <- seq(-1, 1, length.out=3)  # Domain of linkinv, mu.eta based on eta
+    linkfun.testdata <- rep(mean(y), 3)
+    inveta.testdata  <- seq(-1, 1, length.out=3)
 
     if (!is.vectorized(linkfun, linkfun.testdata) ||
         !is.vectorized(linkinv, inveta.testdata)  ||
@@ -125,7 +125,7 @@ bspgldrm <- function(formula, data=NULL, link="log", mb=NULL, sb=NULL, dir_pr_pa
   f0_samples <- fit$samples$f0
   f0star_samples <- matrix(0, nrow = nrow(f0_samples), ncol = length(spt))
   for (iter in 1:nrow(f0_samples)) {
-    wh <- f0_samples[iter, ]
+    wh     <- f0_samples[iter, ]
     theta0 <- gldrm:::getTheta(
       spt = spt,
       f0 = wh,
@@ -133,11 +133,11 @@ bspgldrm <- function(formula, data=NULL, link="log", mb=NULL, sb=NULL, dir_pr_pa
       sampprobs = NULL,
       ySptIndex = NULL
     )$theta
-    wh <- wh * exp(theta0 * spt)
-    wh <- wh / sum(wh)
+    wh                     <- wh * exp(theta0 * spt)
+    wh                     <- wh / sum(wh)
     f0star_samples[iter, ] <- wh
   }
-  f0_samples <- f0star_samples  # projected f0 samples
+  f0_samples     <- f0star_samples  # projected f0 samples
   fit$samples$f0 <- f0_samples
 
   ## 5. Output

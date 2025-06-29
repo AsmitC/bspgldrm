@@ -7,7 +7,7 @@
 #' @param burnin Number of burn-in MCMC iterations. Defaults to 100.
 #' @param thin Factor by which to thin MCMC iterations. Defaults to 10.
 #' @param save Number of MCMC samples to return. Defaults to 1000.
-#' @param rho MCMC update step size, a (scalar) in (0, 1]. Defaults to 0.1.
+#' @param rho MCMC update step size. A scalar in (0, 1]. Defaults to 0.1.
 #' @param mu0 Mean of the reference distribution. The reference distribution is
 #' not unique unless its mean is restricted to a specific value. This value can
 #' be any number within the range of observed values, but values near the boundary
@@ -27,10 +27,10 @@
 bspgldrm.control <- function(burnin=100, thin=10, save=1000, rho=0.1, mu0=NULL, spt=NULL,
                              betaStart=NULL, f0Start=NULL, joint.update=TRUE)
 {
-  if (burnin < 0)            stop("Number of burn-in samples must be >= 0")
-  if (thin < 1)              stop("Thin must be >= 1")
-  if (save < 1)              stop("Must save at least one iteration")
-  if (!(rho <= 1 & rho > 0)) stop("rho must lie in (0, 1]")
+  if (burnin < 0 || floor(burnin) != burnin) stop("Number of burn-in samples must be an integer >= 0")
+  if (thin   < 1 || floor(thin)   != thin)   stop("Thin must be an integer >= 1")
+  if (save   < 1 || floor(save)   != save)   stop("Number of saved iterations must be an integer >= 1")
+  if (!(rho <= 1 & rho > 0))                 stop("rho must lie in (0, 1]")
   ctrl <- list(burnin      = burnin,
                thin        = thin,
                save        = save,
@@ -71,15 +71,12 @@ bspgldrmFit <- function(formula, X, y,                      # Data
   mu.eta  <- link$mu.eta
 
   ## 2. Initialize (theoretical) support if not provided by the user
-  if (is.null(spt)){
-    spt <- sort(unique(y)) ## Observed support
-  }
-  l    <- length(spt)
+  if (is.null(spt)) spt <- sort(unique(y)) ## Observed support
+  l <- length(spt)
 
   ## 3. Initialize mu0 if not provided by the user
-  if (is.null(mu0)) {
-    mu0 <- mean(y)
-  } else if (mu0 <= min(spt) || mu0 >= max(spt)) {
+  if (is.null(mu0)) mu0 <- mean(y)
+  else if (mu0 <= min(spt) || mu0 >= max(spt)) {
     stop(paste0("mu0 must lie within the range of observed values. Choose a different ",
                 "value or set mu0=NULL to use the default value, mean(y)."))
   }
@@ -140,7 +137,7 @@ bspgldrmFit <- function(formula, X, y,                      # Data
     eps         <- 1e-6
     dir_pr_parm <- dir_pr_parm + eps
   } else if (!all(dir_pr_parm > 0) ||
-             length(dir_pr_parm) != l) stop("dir_pr_parm must be positive with K atoms.")
+             length(dir_pr_parm)   != l) stop("dir_pr_parm must be positive with K atoms.")
 
   ### 4.2 Theta
   mu      <- linkinv(X %*% beta)                   # Updated for general link
@@ -153,7 +150,7 @@ bspgldrmFit <- function(formula, X, y,                      # Data
   ## 5. MCMC loop
   for (r in 2:iter) {
     ### 5.1 Beta update
-    Sig   <- Sigma_beta(X, mu, bpr2, rho, linkfun, mu.eta)
+    Sig  <- Sigma_beta(X, mu, bpr2, rho, linkfun, mu.eta)
     if (joint.update) {
       b_out <- beta_update_joint(X, y, spt, beta, Sig, f0, tht,
                                  bpr2, btht, rho, linkfun, linkinv,
