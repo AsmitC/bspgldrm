@@ -1,0 +1,153 @@
+---
+title: "bspgldrm_example"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{bspgldrm_example}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r, include = FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>"
+)
+```
+
+```{r setup}
+library(bspgldrm)
+```
+
+Here, we will provide a few simulation examples for the`bspgldrm` function. Each function named `sim_dat_X` generates a data set corresponding to different instances of $\beta$, $f_0$, the link function, or some combination of those three. In what follows, each code section generates a data set from 
+
+# Data-Generating Functions
+```{r}
+# Required Packages ----
+
+require(mvtnorm)
+require(gldrm)
+require(extraDistr)
+require(dplyr)
+
+# Simulation scenario 1 ----
+sim_dat_1 <- function(n, p) {
+  X <- matrix(c(rep(1, n), rnorm(n * (p-1), mean = 0, sd = 1)),
+              byrow = F,
+              nrow = n,
+              ncol = p)
+  beta <- numeric(p)
+  beta[1:2] <- c(-0.7, 0.2)     # true beta
+  mu <- exp(X %*% beta)         # true mu, g(mu) = log(mu) = X*beta
+  spt <- 0:5                    # support of y
+  f0 <- extraDistr::dtpois(spt, lambda = 1, b = 5)     # true f0
+  theta <- gldrm:::getTheta(
+    spt = spt,
+    f0 = f0,
+    mu = mu,
+    sampprobs = NULL,
+    ySptIndex = NULL
+  )$theta                       # true theta
+  prob <- t(sapply(1:n, function(i)
+    exp(theta[i] * spt) * f0))
+  y <- sapply(1:n, function(i)
+    sample(spt, 1, prob = prob[i, ])) # simulated y
+  sim.data <- data.frame(X, y)
+  return(sim.data)
+}
+
+
+# Simulation scenario 2 ----
+sim_dat_2 <- function(n, p) {
+  X <- matrix(c(rep(1, n), rnorm(n * (p-1), mean = 0, sd = 1)),
+              byrow = F,
+              nrow = n,
+              ncol = p)
+  beta <- numeric(p)
+  beta[1:2] <- c(-0.7, 0.2)     # true beta
+  mu <- exp(X %*% beta)         # true mu, g(mu) = log(mu) = X*beta
+  spt <- 0:5                    # support of y
+  temp <- dpois(spt, lambda = 1)
+  f0 <- numeric(6)
+  f0[1] <- 3 * temp[1] / (3 * temp[1] + sum(temp[-1]))
+  f0[-1] <- temp[-1] / (3 * temp[1] + sum(temp[-1]))  # true f0
+  theta <- gldrm:::getTheta(
+    spt = spt,
+    f0 = f0,
+    mu = mu,
+    sampprobs = NULL,
+    ySptIndex = NULL
+  )$theta                        # true theta
+  prob <- t(sapply(1:n, function(i)
+    exp(theta[i] * spt) * f0))
+  y <- sapply(1:n, function(i)
+    sample(spt, 1, prob = prob[i, ])) # simulated y
+  sim.data <- data.frame(X, y)
+  return(sim.data)
+}
+
+# Simulation scenario 3 ----
+## Binary logistic regression
+sim_dat_3 <- function(n, p) {
+  X <- matrix(c(rep(1, n), rnorm(n * (p-1), mean = 0, sd = 1)),
+              byrow = FALSE, nrow = n, ncol = p)
+  beta <- numeric(p)
+  beta[1:2] <- c(-1, 1)               # True beta
+  mu <- plogis(X %*% beta)            # True mu, g(mu) = logit(mu) = X*beta
+  spt <- 0:1
+  f0  <- dbinom(spt, size = 1, prob = 0.5) # True f0
+  theta <- gldrm:::getTheta(
+    spt = spt,
+    f0  = f0,
+    mu  = mu,
+    sampprobs  = NULL,
+    ySptIndex  = NULL
+  )$theta
+  prob <- t(sapply(1:n, function(i) exp(theta[i] * spt) * f0))
+  y    <- sapply(1:n, function(i) sample(spt, 1, prob = prob[i, ])) # Simulated y
+  data.frame(X, y)
+}
+```
+
+# Simulation
+
+## Example 1
+```{r}
+## Example 1
+
+spt <- 0:5
+mu0 <- 1
+data <- sim_dat_1(n = 500, p = 2)
+dir_glm.fit <- bspgldrm(y ~ X2, data=data, bspgldrmControl=bspgldrm.control(mu0=mu0, spt=spt))
+beta_samples <- dir_glm.fit$samples$beta
+f0_samples <- dir_glm.fit$samples$f0
+colMeans(beta_samples)        # true beta is c(-0.7, 0.2)
+colMeans(f0_samples)          # true f0 is truncated Poisson = (0.368, 0.368, 0.184, 0.061, 0.015, 0.003) [rounded]
+```
+
+
+## Example 2
+```{r}
+## Example 2
+spt <- 0:5
+mu0 <- 1
+data <- sim_dat_2(n = 500, p = 2)
+dir_glm.fit <- bspgldrm(y ~ X2, data=data, bspgldrmControl=bspgldrm.control(mu0=mu0, spt=spt))
+beta_samples <- dir_glm.fit$samples$beta
+f0_samples <- dir_glm.fit$samples$f0
+colMeans(beta_samples)        # true beta is c(-0.7, 0.2)
+colMeans(f0_samples)          # true f0 is tilted, truncated Poisson = (0.636, 0.212, 0.106, 0.035, 0.009, 0.002) [rounded]
+```
+
+## Example 3
+```{r}
+## Example 3
+spt <- 0:1
+mu0 <- 0.5
+data <- sim_dat_3(n = 5000, p = 3)
+dir_glm.fit <- bspgldrm(y ~ X2 + X3, data=data, link="logit",
+                        bspgldrmControl=bspgldrm.control(mu0=mu0, spt=spt))
+beta_samples <- dir_glm.fit$samples$beta
+f0_samples <- dir_glm.fit$samples$f0
+colMeans(beta_samples)        # true beta is c(-1, 1)
+colMeans(f0_samples)          # true f0 is bernoulli(0.5)
+```
